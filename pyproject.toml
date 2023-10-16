@@ -37,6 +37,7 @@ trading-strategy-backtrader = {version="^0.1",  optional = true}
 coloredlogs = {version = "^15.0.1", optional = true}
 filelock = "^3.12.4"
 pytest-xdist = {version="^3.3.1", optional = true}
+fastparquet = "^2023.8.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "7.1.3"

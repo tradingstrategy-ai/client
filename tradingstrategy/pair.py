@@ -2098,6 +2098,11 @@ def _preprocess_loaded_pair_data(data: dict) -> dict:
     assert isinstance(data, dict)
 
     def _fix_val(v):
+
+        if v is pd.NA:
+            # FastParquet fills missing data with pandas._libs.missing.NAType
+            return None
+
         try:
             if isnan(v):
                 return None

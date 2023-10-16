@@ -34,6 +34,7 @@ def test_grouped_candles(persistent_test_client: Client):
     sushi_usdt_candles = candle_universe.get_candles_by_pair(sushi_usdt.pair_id)
 
     # Get max and min weekly candle of SUSHI-USDT on SushiSwap
+    import ipdb ; ipdb.set_trace()
     high_price = sushi_usdt_candles["high"]
     max_price = high_price.max()
 
