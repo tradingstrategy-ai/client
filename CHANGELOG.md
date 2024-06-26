@@ -1,6 +1,7 @@
 # current
 
 - Add: `resample_dataframe` utility function. Useful for resampling dataframes with multiple columns that are not candlestick data
+- Fix: Improve Binance data caching to avoid unnecessary downloads
 
 # 0.22.14
 

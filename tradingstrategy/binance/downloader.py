@@ -1,7 +1,7 @@
 """Get candlestick price and volume data from Binance.
 
 """
-
+import re
 import requests
 import datetime
 import pandas as pd
@@ -129,9 +129,7 @@ class BinanceDownloader:
             )
             dataframes.append(df)
 
-            # Count the cached file size
-            path = self.get_parquet_path(symbol, time_bucket, start_at, end_at)
-            total_size += os.path.getsize(path)
+            total_size += self._get_parquet_size(df, symbol, time_bucket, start_at, end_at)
 
             if progress_bar:
                 progress_bar.set_postfix(
@@ -361,11 +359,7 @@ class BinanceDownloader:
             )
             dataframes.append(df)
 
-            # Count the cached file size
-            path = self.get_parquet_path(
-                asset_symbol, time_bucket, start_at, end_at, is_lending=True
-            )
-            total_size += os.path.getsize(path)
+            total_size += self._get_parquet_size(df, asset_symbol, time_bucket, start_at, end_at, is_lending=True)
 
             if progress_bar:
                 progress_bar.set_postfix(
@@ -558,6 +552,13 @@ class BinanceDownloader:
         :param end_at: End date of the data
         :return: Path to the parquet file
         """
+        non_date_string = self._get_non_date_string(symbol, time_bucket, is_lending)
+        file_name_with_bigger_date_range = self._get_file_name_with_bigger_date_range(non_date_string, start_at, end_at)
+        if file_name_with_bigger_date_range:
+            bigger_parquet_path = self.cache_directory.joinpath(file_name_with_bigger_date_range)
+            bigger_df = pd.read_parquet(bigger_parquet_path)
+            return bigger_df[start_at:end_at]
+        
         path = self.get_parquet_path(symbol, time_bucket, start_at, end_at, is_lending)
         try:
             return pd.read_parquet(path)
@@ -580,15 +581,69 @@ class BinanceDownloader:
         :param end_at: End date of the data
         :return: Path to the parquet file
         """
+        non_date_string = self._get_non_date_string(symbol, time_bucket, is_lending)
+        file = Path(
+            f"{non_date_string}-{start_at}-{end_at}.parquet"
+        )
+        return self.cache_directory.joinpath(file)
+    
+    def _get_file_name_with_bigger_date_range(self, non_date_string: str, start_at: datetime.datetime, end_at: datetime.datetime):
+        """Get parquet file name with a bigger date range."""
+        for file in self.cache_directory.glob(f"{non_date_string}*.parquet"):
+            match = re.match(rf"{non_date_string}-(\d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}:\d{{2}})-(\d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}:\d{{2}}).parquet", file.name)
+            if match:
+                file_start_at = datetime.datetime.fromisoformat(match.group(1))
+                file_end_at = datetime.datetime.fromisoformat(match.group(2))
+                if file_start_at <= start_at and file_end_at >= end_at:
+                    return file.name
+        return None
+
+    @staticmethod
+    def _get_non_date_string(
+        symbol: str,
+        time_bucket: TimeBucket,
+        is_lending: bool,
+    ) -> str:
+        """Get part of parquet file name that is not a date.
+
+        :param symbol: Trading pair symbol E.g. ETHUSDC
+        :param time_bucket: TimeBucket instance
+        :return: string
+        """
         if is_lending:
             file_str = "lending"
         else:
             file_str = "candles"
-
-        file = Path(
-            file_str + f"-{symbol}-{time_bucket.value}-{start_at}-{end_at}.parquet"
-        )
-        return self.cache_directory.joinpath(file)
+        return f"{file_str}-{symbol}-{time_bucket.value}"
+    
+    def _get_parquet_size(
+        self, 
+        df: pd.DataFrame, 
+        symbol: str, 
+        time_bucket: TimeBucket, 
+        start_at: datetime.datetime, end_at: datetime.datetime, 
+        is_lending:bool=False,
+    ) -> int:
+        """Gets the size of the parquet file or the dataframe in memory if the parquet file does not exist.
+        
+        :param df: Dataframe
+        :param symbol: Trading pair symbol E.g. ETHUSDC
+        :param time_bucket: TimeBucket instance
+        :param start_at: Start date of the data
+        :param end_at: End date of the data
+        :param is_lending: Whether the data is lending data or not
+        :return: Size in bytes
+        """
+        try:
+            # Count the cached file size
+            path = self.get_parquet_path(symbol, time_bucket, start_at, end_at, is_lending)
+            size = os.path.getsize(path)
+        except:
+            # Count the size of the dataframe
+            # Can be inaccurate
+            # Divide by 2 based on rough testing for memory usage -> parquet file size
+            size = df.memory_usage(deep=True).sum()/2
+        return size
 
     def overwrite_cached_data(
         self,
