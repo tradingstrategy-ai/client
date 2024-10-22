@@ -623,6 +623,8 @@ def categorise_pairs(
 
     See also :py:attr:`SAMPLE_CATEGORIES` for soe example categories.
 
+    See also another example in :py:func:`tradingstrategy.utils.token_filter.deduplicate_pairs_by_volume`.
+
     :param coingecko_universe:
         Coingecko data bundle.
 
